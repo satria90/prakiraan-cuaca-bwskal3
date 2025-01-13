@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prakiraan Cuaca dari Openweathermap</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900&display=swap" rel="stylesheet">
+    <style type="text/css">
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        body {
+            padding: 0;
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+        }
+        header {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: #fffd;
+            padding: 10px 20px;
+            width: calc(100% - 180px);
+        }
+        header h1 {
+            padding: 0;
+            margin: 0;
+        }
+        header .select {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="title">
+            <h1>Prakiraan Cuaca WS Barito</h1>
+        </div>
+        <div class="select">
+            <select name="select-tanggal" id="select-tanggal">
+                <!-- Tanggal akan diisi dengan format tanggal-bulan-tahun -->
+            </select>
+        </div>
+    </header>
+    <div id="map"></div>
+
+    <div class="leaflet-bottom leaflet-left">
+        <div class="legendcmax leaflet-control">
+            <img style="height: 42vh; border: 2px solid rgba(0, 0, 0, 0.867);" src="./icon/legend.png">
+        </div>
+    </div>    
+
+    <div class="leaflet-bottom leaflet-left">
+        <div class="legendcmax leaflet-control">
+        </div>
+    </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+crossorigin=""></script>
+<script type="text/javascript">
+    const apiKey = '870bd02dc7212d7ff55d26cbb512befd';
+
+    // Fungsi untuk mendapatkan data cuaca dari OpenWeatherMap
+    async function getWeather(lat, lon) {
+        const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch data');
+            const data = await response.json();
+            return data.list; // Mengembalikan array 'list' dari data cuaca
+        } catch (error) {
+            alert('Tidak dapat mengambil data cuaca. Silakan coba lagi nanti.');
+            console.error('Error fetching weather data:', error);
+            return null;
+        }
+    }
+
+    // Fungsi untuk memperbarui marker dengan data cuaca berdasarkan tanggal yang dipilih
+    function updateMarkerIcon(marker, weatherList, selectedDate) {
+        // Filter data cuaca berdasarkan tanggal yang dipilih
+        const filteredWeather = weatherList.filter(item => {
+            const itemDate = new Date(item.dt_txt).toLocaleDateString('id-ID');
+            return itemDate === selectedDate;
+        });
+
+       // Fungsi untuk mencari cuaca pada jam tertentu, atau menggunakan jam terdekat
+        function findWeatherByHour(filteredWeather, targetHour) {
+            // Mencari data cuaca untuk jam target
+            const exactWeather = filteredWeather.find(item => new Date(item.dt_txt).getHours() === targetHour);
+
+            // Jika tidak ada data pada jam yang ditentukan, gunakan jam terdekat
+            if (!exactWeather) {
+                // Coba cari jam terdekat (misalnya, targetHour ± 1)
+                return filteredWeather.find(item => {
+                    const hour = new Date(item.dt_txt).getHours();
+                    return Math.abs(hour - targetHour) <= 1;
+                });
+            }
+
+            return exactWeather;
+        }
+
+        // Ambil cuaca pagi (09:00), siang (12:00), dan malam (18:00)
+        let morningWeather = findWeatherByHour(filteredWeather, 6);
+        let afternoonWeather = findWeatherByHour(filteredWeather, 12);
+        let eveningWeather = findWeatherByHour(filteredWeather, 18);
+
+        // Cek jika data tidak ditemukan
+        if (!morningWeather || !afternoonWeather || !eveningWeather) {
+            // Ambil 3 item pertama dari filteredWeather
+            const firstThreeItems = filteredWeather.slice(0, 3);
+            
+            // Jika ada cukup data, set morning, afternoon, evening weather
+            if (firstThreeItems.length > 0) {
+                morningWeather = firstThreeItems[0]; // Item pertama
+                afternoonWeather = firstThreeItems[1] || null; // Item kedua jika ada
+                eveningWeather = firstThreeItems[2] || null; // Item ketiga jika ada
+            }
+        }
+
+        // Update ikon marker dan konten popup jika data cuaca ada
+        if (morningWeather && afternoonWeather && eveningWeather) {
+            // Menggunakan ikon dari direktori lokal
+            const newIcon = L.icon({
+                iconUrl: `./icon/${morningWeather.weather[0].icon}.png`, // Mengambil ikon lokal
+                iconSize: [70, 70],
+            });
+            marker.setIcon(newIcon);
+
+            marker.bindPopup(`
+                <b>${marker.getTooltip().getContent()}</b>
+                <table class="weather-table">
+                    <tr>
+                        <td><strong>Pukul :</strong></td>
+                        <td>${new Date(morningWeather.dt_txt).toLocaleTimeString('id-ID')} - ${morningWeather.weather[0].description}</></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pukul :</strong></td>
+                        <td>${new Date(afternoonWeather.dt_txt).toLocaleTimeString('id-ID')} - ${afternoonWeather.weather[0].description}</b></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pukul :</strong></td>
+                        <td>${new Date(eveningWeather.dt_txt).toLocaleTimeString('id-ID')} - ${eveningWeather.weather[0].description}</b></td>
+                    </tr>
+                </table>
+            `);
+        } else {
+            marker.bindPopup(`<b>Data cuaca tidak lengkap untuk tanggal ini.</b>`);
+        }
+
+    }
+
+    // Fungsi untuk mengupdate semua marker berdasarkan pilihan tanggal
+    async function updateMarkers(selectedDate) {
+        const selectedFormattedDate = new Date(selectedDate).toLocaleDateString('id-ID');
+
+        // Mengambil semua data cuaca untuk Kimato
+        const kimatoWeatherData = await Promise.all(
+            kimatoMarkers.map(markerData => getWeather(markerData.lat, markerData.lon))
+        );
+
+        // Update marker untuk Kimato
+        for (let i = 0; i < kimatoMarkers.length; i++) {
+            const weatherList = kimatoWeatherData[i];
+            if (weatherList && weatherList.length > 0) {
+                const marker = markers[i];
+                updateMarkerIcon(marker, weatherList, selectedFormattedDate);
+            }
+        }
+
+        // Mengambil semua data cuaca untuk PCH
+        const PCHWeatherData = await Promise.all(
+            PCHMarkers.map(markerData => getWeather(markerData.lat, markerData.lon))
+        );
+
+        // Update marker untuk PCH
+        for (let i = 0; i < PCHMarkers.length; i++) {
+            const weatherList = PCHWeatherData[i];
+            if (weatherList && weatherList.length > 0) {
+                const marker = PCHMarkersAdded[i];
+                updateMarkerIcon(marker, weatherList, selectedFormattedDate);
+            }
+        }
+
+        // Mengambil semua data cuaca untuk PDA
+        const PDAWeatherData = await Promise.all(
+            PDAMarkers.map(markerData => getWeather(markerData.lat, markerData.lon))
+        );
+
+        // Update marker untuk PDA
+        for (let i = 0; i < PDAMarkers.length; i++) {
+            const weatherList = PDAWeatherData[i];
+            if (weatherList && weatherList.length > 0) {
+                const marker = PDAMarkersAdded[i];
+                updateMarkerIcon(marker, weatherList, selectedFormattedDate);
+            }
+        }
+    }
+
+
+    var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    });
+
+    var map = L.map('map', {
+        center: [-2.94348, 115.37565],
+        zoom: 9,
+        layers: [osm]
+    });
+
+    let kimato= L.layerGroup();
+    let pch= L.layerGroup();
+    let pda= L.layerGroup();
+
+    let baseLayers = {
+        'Open Street Map': osm,
+    };
+
+    let overLayers = {
+        'Kimatologi': kimato,
+        'PCH': pch,
+        'PDA': pda,
+    };
+
+    L.control.layers(baseLayers, overLayers).addTo(map);
+
+    let kimatoMarkers = [
+        { lat: -3.85673055555556, lon: 115.219263888889, title: "POS KLIMATOLOGI KINTAP" },
+        { lat: -3.30008333333333, lon: 115.918333333333, title: "POS KLIMATOLOGI SUNGAI MIRIH" },
+        { lat: -2.88705, lon: 115.2409, title: "POS KLIMATOLOGI TATAKAN" },
+        { lat: -2.18547222222222, lon: 115.434166666667, title: "POS KLIMATOLOGI MABU'UN" },
+        { lat: -2.60966666666667, lon: 115.443361111111, title: "POS KLIMATOLOGI KAHAKAN" },
+        { lat: -3.34344444444444, lon: 114.694444444444, title: "POS KLIMATOLOGI SUNGAI TABUK" },
+        { lat: -0.947805555555556, lon: 114.89975, title: "POS KLIMATOLOGI MUARA TEWEH" },
+        { lat: -1.92388888888889, lon: 115.1185, title: "POS KLIMATOLOGI TAMPA" }
+    ];
+
+    let markers = kimatoMarkers.map(markerData => {
+        const marker = L.marker([markerData.lat, markerData.lon]).bindTooltip(markerData.title).addTo(kimato);
+        return marker;
+    });
+
+    let PCHMarkers = [
+        { lat: -2.8253115, lon: 115.12043333333, title: "PCH BALIMAU" },
+        { lat: -2.7112, lon: 115.366041666667, title: "PCH MO'UI" },
+        { lat: -2.5252, lon: 115.337183333333, title: "PCH KAMBAT" },
+        { lat: -2.52388333333333, lon: 115.51745, title: "PCH BATU TANGGA" },
+        { lat: -2.55986666666667, lon: 115.4587, title: "PCH INTANGAN" },
+        { lat: -2.65595, lon: 115.388766666667, title: "PCH MANGUANG" },
+        { lat: -2.73526666666667, lon: 115.337566666667, title: "PCH TELAGA LANGSAT" },
+        { lat: -1.76569444444444, lon: 114.848888888889, title: "PCH BUNTOK" },
+        { lat: -1.55327777777778, lon: 115.052888888889, title: "PCH TABAK KALINAN" },
+        { lat: -3.0400, lon: 115.983866666667, title: "PCH CANTUNG" },
+        { lat: -3.23981666666667, lon: 115.758166666667, title: "PCH MENTEWE" },
+        { lat: -3.50663333333333, lon: 115.989944444444, title: "PCH SEGUMBANG" },
+        { lat: -3.02766666666667, lon: 114.781777777778, title: "PCH BANTUIL" },
+        { lat: -3.4686, lon: 114.92065, title: "PCH PADANG PANJANG" },
+        { lat: -3.75847222222222, lon: 114.612166666667, title: "PCH TABUNIO" },
+        { lat: -3.90391666666667, lon: 114.903611111111, title: "PCH BATU AMPAR" },
+        { lat: -2.94344444444444, lon: 115.112333333333, title: "PCH SERAWI" },
+        { lat: -2.26944444444444, lon: 115.48125, title: "PCH DAHAI" },
+        { lat: -3.28544444444444, lon: 115.384333333333, title: "PCH ATI'IM" },
+        { lat: -2.60505555555556, lon: 115.902555555556, title: "PCH PANDAK DAUN" },
+        { lat: -2.41736111111111, lon: 115.267333333333, title: "PCH LOK BANGKAI" },
+        { lat: -3.2966, lon: 114.5871, title: "PCH BANJARMASIN" },
+        { lat: -2.96672222222222, lon: 115.152944444444, title: "PCH KURANJI" },
+        { lat: -3.52836111111111, lon: 114.725527777778, title: "PCH LIANG ANGGANG" },
+        { lat: -2.75333333333333, lon: 115.249527777778, title: "PCH LUNGAU" },
+        { lat: -2.97371666666667, lon: 114.7729, title: "PCH LEPASAN" }
+    ];
+
+    let PCHMarkersAdded = PCHMarkers.map(markerData => {
+        const marker = L.marker([markerData.lat, markerData.lon]).bindTooltip(markerData.title).addTo(pch);
+        return marker;
+    });
+
+    let PDAMarkers = [
+        { lat: -3.76422222222222, lon: 114.620138888889, title: "PDA TABUNIO" },
+        { lat: -3.37030555555556, lon: 114.923388888889, title: "PDA ASTANBUL" },
+        { lat: -2.16127777777778, lon: 115.387888888889, title: "PDA TANJUNG" },
+        { lat: -2.05422222222222, lon: 115.454916666667, title: "PDA MAHE" },
+        { lat: -2.02575, lon: 115.528916666667, title: "PDA BATU PULUT" },
+        { lat: -2.45933333333333, lon: 115.574, title: "PDA JU'UH" },
+        { lat: -2.64269444444444, lon: 115.476833333333, title: "PDA BARUH BATUNG" },
+        { lat: -2.82027777777778, lon: 115.418416666667, title: "PDA LOKSADO" },
+        { lat: -3.462, lon: 114.531666666667, title: "PDA ALUH-ALUH" },
+        { lat: -2.41998333333333, lon: 115.251016666667, title: "PDA AMUNTAI" },
+        { lat: -3.27561111111111, lon: 115.121472222222, title: "PDA MENGKAUK" },
+        { lat: -3.52830555555556, lon: 114.726138888889, title: "PDA MALUKA" },
+        { lat: -3.30275, lon: 115.081333333333, title: "PDA SUNGAI LANGSAT" },
+        { lat: -2.96003333333333, lon: 115.151766666667, title: "PDA BUNGUR" },
+        { lat: -2.43803333333333, lon: 115.537783333333, title: "PDA BIHARA" },
+        { lat: -2.33641666666667, lon: 115.37695, title: "PDA LAMPIHONG" },
+        { lat: -2.752, lon: 115.24305, title: "PDA LUNGAU" },
+        { lat: -2.9783, lon: 114.776566666667, title: "PDA MARABAHAN" },
+        { lat: -3.05941666666667, lon: 114.71535, title: "PDA GAMPA" },
+        { lat: -3.32786666666667, lon: 114.714083333333, title: "PDA GUDANG TENGAH" },
+        { lat: -3.31813333333333, lon: 114.603041666667, title: "PDA SUNGAI BILU" },
+        { lat: -3.05041666666667, lon: 115.987611111111, title: "PDA CANTUNG" },
+        { lat: -3.703425, lon: 115.401719444444, title: "PDA JOMBANG" },
+        { lat: -3.48561111111111, lon: 115.783527777778, title: "PDA BEKARANG" },
+        { lat: -0.964333333333333, lon: 114.885333333333, title: "PDA MUARATEWEH" },
+        { lat: -1.8025, lon: 115.1565, title: "PDA AMPAH" },
+        { lat: -1.92811111111111, lon: 115.119472222222, title: "PDA TAMPA" },
+        { lat: -1.26758333333333, lon: 115.120194444444, title: "PDA KANDUI" },
+        { lat: -1.97816666666667, lon: 115.583333, title: "PDA HAYAPING" },
+        { lat: -1.53155555555556, lon: 115.156861111111, title: "PDA PATAS" },
+        { lat: -1.64394444444444, lon: 114.80625, title: "PDA KALAHIEN" }
+    ];
+
+    let PDAMarkersAdded = PDAMarkers.map(markerData => {
+        const marker = L.marker([markerData.lat, markerData.lon])
+            .bindTooltip(markerData.title)
+            .addTo(pda);
+        return marker;
+    });
+    // Select dropdown tanggal
+    document.getElementById('select-tanggal').addEventListener('change', function() {
+        const selectedDate = this.value;
+        updateMarkers(selectedDate);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectElement = document.getElementById('select-tanggal');
+        const today = new Date();
+        const day2 = new Date(today);
+        const day3 = new Date(today);
+        day2.setDate(today.getDate() + 1);
+        day3.setDate(today.getDate() + 2);
+
+        const options = [
+            { value: today.toISOString(), date: today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) },
+            { value: day2.toISOString(), date: day2.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) },
+            { value: day3.toISOString(), date: day3.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }
+        ];
+
+        selectElement.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.date}</option>`).join('');
+        updateMarkers(today.toISOString());
+    });
+</script>
+</body>
+</html>

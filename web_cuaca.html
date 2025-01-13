@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prakiraan Cuaca dari Openweathermap</title>
+     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+     <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
+    <style type="text/css">
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        body {
+            padding: 0;
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+        }
+        header {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: #fffd;
+            padding: 10px 20px;
+            width: calc(100% - 180px);
+        }
+        header h1 {
+            padding: 0;
+            margin: 0;
+        }
+        header .select {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Kondisi Cuaca WS Barito</h1>
+    </header>
+    <div id="map"></div>
+
+    <div class="leaflet-bottom leaflet-left">
+        <div class="legendcmax leaflet-control">
+            <img style=" height: 42vh; border: 2px solid black;" src="./icon/legend.png" >
+        </div>
+    </div>
+
+</body>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+crossorigin=""></script>
+<script type="text/javascript">
+    // API Key untuk OpenWeatherMap
+    const apiKey = '3c26dad28b3de7b229d355b6cd456d8c';
+    // Fungsi untuk mendapatkan data cuaca dari OpenWeatherMap
+    async function getWeather(lat, lon) {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            return {
+                main: data.weather[0].main,
+                description: data.weather[0].description,
+                rain: data.rain ? data.rain['1h'] : null,
+                humidity: data.main.humidity,
+                windSpeed: data.wind.speed,
+                icon: data.weather[0].icon,
+                dt: data.dt,
+            };
+        } catch (error) {
+            console.error('Error fetching weather data:', error);
+            return null;
+        }
+    }
+
+    function updateMarkerIcon(marker, weather) {
+        const newIcon = L.icon({
+            iconUrl: './icon/' + weather.icon + '.png',
+            iconSize: [70, 70],
+        });
+        marker.setIcon(newIcon);
+    }
+    //Main MAP KALIMANTAN SELATAN
+    ///Layer Group
+    var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
+    var Esri_WorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    var CartoDB_DarkMatter = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    });
+
+    var map = L.map('map', {
+        center: [-2.94348, 115.37565],
+        zoom: 9,
+        layers: [osm]
+    })
+    
+    //layerGroup
+    const kimato= L.layerGroup();
+    const pch= L.layerGroup();
+    const pda= L.layerGroup();
+    
+    //baseLayers
+    const baseLayers={
+        'Open Street Map': osm,
+        'Esi WorlImagery': Esri_WorldImagery,
+        'CartoDB DarkMatter': CartoDB_DarkMatter
+    }
+    const overLayers={
+        'Kimatologi' : kimato,
+        'PCH':pch,
+        'PDA':pda,
+    }
+    //LayerControl
+    const LayerControl = L.control.layers(baseLayers, overLayers).addTo(map);
+
+    //Marker POS KIMATOLOGI
+    const kimatoMarkers = [
+        { lat: -3.85673055555556, lon: 115.219263888889, title: "POS KLIMATOLOGI KINTAP" },
+        { lat: -3.30008333333333, lon: 115.918333333333, title: "POS KLIMATOLOGI SUNGAI MIRIH" },
+        { lat: -2.88705, lon: 115.2409, title: "POS KLIMATOLOGI TATAKAN" },
+        { lat: -2.18547222222222, lon: 115.434166666667, title: "POS KLIMATOLOGI MABU'UN" },
+        { lat: -2.60966666666667, lon: 115.443361111111, title: "POS KLIMATOLOGI KAHAKAN" },
+        { lat: -3.34344444444444, lon: 114.694444444444, title: "POS KLIMATOLOGI SUNGAI TABUK" },
+        { lat: -0.947805555555556, lon: 114.89975, title: "POS KLIMATOLOGI MUARA TEWEH" },
+        { lat: -1.92388888888889, lon: 115.1185, title: "POS KLIMATOLOGI TAMPA" }
+    ];
+    kimatoMarkers.forEach(async (markerData) => {
+        const weather = await getWeather(markerData.lat, markerData.lon);
+        let customIcon = L.icon({
+            iconUrl: './icon/kimatologi.png',
+            iconSize: [32,32],
+        });
+        if (weather) { 
+            customIcon = L.icon({
+                iconUrl: './icon/'+weather.icon+'.png',
+                iconSize: [70,70],
+            });
+        }
+        
+        const marker = L.marker([markerData.lat, markerData.lon], { title: markerData.title, icon: customIcon }).addTo(kimato);
+
+        // Perbarui ikon dan data cuaca setiap 10 menit (600.000 ms)
+        setInterval(async function() {
+            const weather = await getWeather(markerData.lat, markerData.lon);
+            if (weather) {
+                updateMarkerIcon(marker, weather);
+                // Update informasi popup jika diperlukan
+            }
+        }, 600000);
+        
+        marker.on('click', async function() {
+            const weather = await getWeather(markerData.lat, markerData.lon);
+            if (weather) {
+                updateMarkerIcon(marker, weather);
+                // Unix timestamp
+                let timestamp = weather.dt;
+                timestamp *= 1000;
+                let date = new Date(timestamp);
+                let dateString = date.toLocaleString('en-US', { 
+                    timeZone: 'Asia/Makassar', 
+                    year: 'numeric', 
+                    month: 'numeric', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: 'numeric', 
+                    second: 'numeric' 
+                });
+                
+                const rain = weather.rain ? weather.rain + ' mm' : '-';
+
+                marker.bindPopup(`
+                    <b>${markerData.title}</b>
+                        <table>
+                            <tr><td><b>Kondisi Cuaca</b></td><td>: ${weather.main}</td></tr>
+                            <tr><td><b>Keterangan</b></td><td>: ${weather.description}</td></tr>
+                            <tr><td><b>Volume Hujan</b></td><td>: ${rain}</td></tr>
+                            <tr><td><b>Kelembapan</b></td><td>: ${weather.humidity}%</td></tr>
+                            <tr><td><b>Kecepatan Angin</b></td><td>: ${weather.windSpeed} m/s</td></tr>
+                            <tr><td><b>Waktu</b></td><td>: ${dateString}</td></tr>
+                        </table>
+                `).openPopup();
+            } else {
+                marker.bindPopup(`<b>${markerData.title}</b><br>Unable to fetch weather data.`).openPopup();
+            }
+        });
+    });                 
+    //Marker POS PCH
+    let PCHMarkers = [
+        { lat: -2.8253115, lon: 115.12043333333, title: "PCH BALIMAU" },
+        { lat: -2.7112, lon: 115.366041666667, title: "PCH MO'UI" },
+        { lat: -2.5252, lon: 115.337183333333, title: "PCH KAMBAT" },
+        { lat: -2.52388333333333, lon: 115.51745, title: "PCH BATU TANGGA" },
+        { lat: -2.55986666666667, lon: 115.4587, title: "PCH INTANGAN" },
+        { lat: -2.65595, lon: 115.388766666667, title: "PCH MANGUANG" },
+        { lat: -2.73526666666667, lon: 115.337566666667, title: "PCH TELAGA LANGSAT" },
+        { lat: -1.76569444444444, lon: 114.848888888889, title: "PCH BUNTOK" },
+        { lat: -1.55327777777778, lon: 115.052888888889, title: "PCH TABAK KALINAN" },
+        { lat: -3.0400, lon: 115.983866666667, title: "PCH CANTUNG" },
+        { lat: -3.23981666666667, lon: 115.758166666667, title: "PCH MENTEWE" },
+        { lat: -3.50663333333333, lon: 115.989944444444, title: "PCH SEGUMBANG" },
+        { lat: -3.02766666666667, lon: 114.781777777778, title: "PCH BANTUIL" },
+        { lat: -3.4686, lon: 114.92065, title: "PCH PADANG PANJANG" },
+        { lat: -3.75847222222222, lon: 114.612166666667, title: "PCH TABUNIO" },
+        { lat: -3.90391666666667, lon: 114.903611111111, title: "PCH BATU AMPAR" },
+        { lat: -2.94344444444444, lon: 115.112333333333, title: "PCH SERAWI" },
+        { lat: -2.26944444444444, lon: 115.48125, title: "PCH DAHAI" },
+        { lat: -3.28544444444444, lon: 115.384333333333, title: "PCH ATI'IM" },
+        { lat: -2.60505555555556, lon: 115.902555555556, title: "PCH PANDAK DAUN" },
+        { lat: -2.41736111111111, lon: 115.267333333333, title: "PCH LOK BANGKAI" },
+        { lat: -3.2966, lon: 114.5871, title: "PCH BANJARMASIN" },
+        { lat: -2.96672222222222, lon: 115.152944444444, title: "PCH KURANJI" },
+        { lat: -3.52836111111111, lon: 114.725527777778, title: "PCH LIANG ANGGANG" },
+        { lat: -2.75333333333333, lon: 115.249527777778, title: "PCH LUNGAU" },
+        { lat: -2.97371666666667, lon: 114.7729, title: "PCH LEPASAN" }
+    ];
+
+
+    PCHMarkers.forEach(async (markerData) => {
+        const weather = await getWeather(markerData.lat, markerData.lon);
+        let customIcon = L.icon({
+        iconUrl: './icon/pch1.png',
+        iconSize: [32,32],
+        })
+        if (weather){             
+                customIcon = L.icon({
+                iconUrl: './icon/'+weather.icon+'.png',
+                iconSize: [70,70],
+            })
+        }
+        const marker = L.marker([markerData.lat, markerData.lon], { title: markerData.title, icon: customIcon }).addTo(pch);
+        
+        // Perbarui ikon dan data cuaca setiap 10 menit (600.000 ms)
+        setInterval(async function() {
+            const weather = await getWeather(markerData.lat, markerData.lon);
+            if (weather) {
+                updateMarkerIcon(marker, weather);
+            }
+        }, 600000);
+
+        marker.on('click', async function() {
+            const weather = await getWeather(markerData.lat, markerData.lon);
+            if (weather) {
+                updateMarkerIcon(marker, weather);
+                // Unix timestamp
+                let timestamp = weather.dt;
+                // Convert to milliseconds
+                timestamp *= 1000;
+                // Create a new Date object
+                let date = new Date(timestamp);
+                // Get the date and time in WITA (UTC+8)
+                let dateString = date.toLocaleString('en-US', { 
+                    timeZone: 'Asia/Makassar', 
+                    year: 'numeric', 
+                    month: 'numeric', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: 'numeric', 
+                    second: 'numeric' 
+                });
+                
+                // Handle the case where weather.rain might be undefined
+                const rain = weather.rain ? weather.rain + ' mm' : '-';
+
+                marker.bindPopup(`
+                    <b>${markerData.title}</b>
+                        <table>
+                            <tr><td><b>Kondisi Cuaca</b></td><td>: ${weather.main}</td></tr>
+                            <tr><td><b>Keterangan</b></td><td>: ${weather.description}</td></tr>
+                            <tr><td><b>Volume Hujan</b></td><td>: ${rain}</td></tr>
+                            <tr><td><b>Kelembapan</b></td><td>: ${weather.humidity}%</td></tr>
+                            <tr><td><b>Kecepatan Angin</b></td><td>: ${weather.windSpeed} m/s</td></tr>
+                            <tr><td><b>Waktu</b></td><td>: ${dateString}</td></tr>
+                        </table>
+                `).openPopup();
+            } else {
+                marker.bindPopup(`<b>${markerData.title}</b><br>Unable to fetch weather data.`).openPopup();
+            }
+        });
+    });
+    
+    //Marker POS PDA
+    const PDAMarkers = [
+        { lat: -3.76422222222222, lon: 114.620138888889, title: "PDA TABUNIO" },
+        { lat: -3.37030555555556, lon: 114.923388888889, title: "PDA ASTANBUL" },
+        { lat: -2.16127777777778, lon: 115.387888888889, title: "PDA TANJUNG" },
+        { lat: -2.05422222222222, lon: 115.454916666667, title: "PDA MAHE" },
+        { lat: -2.02575, lon: 115.528916666667, title: "PDA BATU PULUT" },
+        { lat: -2.45933333333333, lon: 115.574, title: "PDA JU'UH" },
+        { lat: -2.64269444444444, lon: 115.476833333333, title: "PDA BARUH BATUNG" },
+        { lat: -2.82027777777778, lon: 115.418416666667, title: "PDA LOKSADO" },
+        { lat: -3.462, lon: 114.531666666667, title: "PDA ALUH-ALUH" },
+        { lat: -2.41998333333333, lon: 115.251016666667, title: "PDA AMUNTAI" },
+        { lat: -3.27561111111111, lon: 115.121472222222, title: "PDA MENGKAUK" },
+        { lat: -3.52830555555556, lon: 114.726138888889, title: "PDA MALUKA" },
+        { lat: -3.30275, lon: 115.081333333333, title: "PDA SUNGAI LANGSAT" },
+        { lat: -2.96003333333333, lon: 115.151766666667, title: "PDA BUNGUR" },
+        { lat: -2.43803333333333, lon: 115.537783333333, title: "PDA BIHARA" },
+        { lat: -2.33641666666667, lon: 115.37695, title: "PDA LAMPIHONG" },
+        { lat: -2.752, lon: 115.24305, title: "PDA LUNGAU" },
+        { lat: -2.9783, lon: 114.776566666667, title: "PDA MARABAHAN" },
+        { lat: -3.05941666666667, lon: 114.71535, title: "PDA GAMPA" },
+        { lat: -3.32786666666667, lon: 114.714083333333, title: "PDA GUDANG TENGAH" },
+        { lat: -3.31813333333333, lon: 114.603041666667, title: "PDA SUNGAI BILU" },
+        { lat: -3.05041666666667, lon: 115.987611111111, title: "PDA CANTUNG" },
+        { lat: -3.703425, lon: 115.401719444444, title: "PDA JOMBANG" },
+        { lat: -3.48561111111111, lon: 115.783527777778, title: "PDA BEKARANG" },
+        { lat: -0.964333333333333, lon: 114.885333333333, title: "PDA MUARATEWEH" },
+        { lat: -1.8025, lon: 115.1565, title: "PDA AMPAH" },
+        { lat: -1.92811111111111, lon: 115.119472222222, title: "PDA TAMPA" },
+        { lat: -1.26758333333333, lon: 115.120194444444, title: "PDA KANDUI" },
+        { lat: -1.97816666666667, lon: 235833333333, title: "PDA HAYAPING" },
+        { lat: -1.53155555555556, lon: 115.156861111111, title: "PDA PATAS" },
+        { lat: -1.64394444444444, lon: 114.80625, title: "PDA KALAHIEN" }
+    ];
+    PDAMarkers.forEach(async (markerData) => {
+        const weather = await getWeather(markerData.lat, markerData.lon);
+        let customIcon = L.icon({
+        iconUrl: './icon/pda1.png',
+        iconSize: [32,32],
+        })
+        if (weather){
+            
+                customIcon = L.icon({
+                iconUrl: './icon/'+weather.icon+'.png',
+                iconSize: [70,70],
+            })
+        }
+        const marker = L.marker([markerData.lat, markerData.lon], { title: markerData.title, icon: customIcon }).addTo(pda);                    
+            // Perbarui ikon dan data cuaca setiap 10 menit (600.000 ms)
+            setInterval(async function() {
+                const weather = await getWeather(markerData.lat, markerData.lon);
+                if (weather) {
+                        updateMarkerIcon(marker, weather);
+                        // Update informasi popup jika diperlukan
+                    }
+            }, 600000);
+        
+        marker.on('click', async function() {
+            const weather = await getWeather(markerData.lat, markerData.lon);
+            if (weather) {
+                updateMarkerIcon(marker, weather);
+                // Unix timestamp
+                let timestamp = weather.dt;
+                // Convert to milliseconds
+                timestamp *= 1000;
+                const options = { 
+                    timeZone: 'Asia/Makassar', 
+                    year: 'numeric', 
+                    month: 'numeric', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: 'numeric', 
+                    second: 'numeric' 
+                };
+                // Create a new Date object
+                let date = new Date(timestamp);
+                // Get the date and time
+                let dateString = date.toLocaleString('en-US', options);
+                // Handle the case where weather.rain might be undefined
+                const rain = weather.rain ? weather.rain + ' mm' : '-';
+                marker.bindPopup(`
+                    <b>${markerData.title}</b>
+                        <table>
+                            <tr><td><b>Kondisi Cuaca</b></td><td>: ${weather.main}</td></tr>
+                            <tr><td><b>Keterangan</b></td><td>: ${weather.description}</td></tr>
+                            <tr><td><b>Volume Hujan</b></td><td>: ${rain}</td></tr>
+                            <tr><td><b>Kelembapan</b></td><td>: ${weather.humidity}%</td></tr>
+                            <tr><td><b>Kecepatan Angin</b></td><td>: ${weather.windSpeed} m/s</td></tr>
+                            <tr><td><b>Waktu</b></td><td>: ${dateString}</td></tr>
+                        </table>
+                `).openPopup();
+            } else {
+                marker.bindPopup(`<b>${markerData.title}</b><br>Unable to fetch weather data.`).openPopup();
+            }
+        });
+    });
+    //
+</script>
+</html>
